@@ -16,6 +16,7 @@ clean:
 	$(MAKE) -C $(KDIR) M=$(CURDIR) clean
 
 # This install target actually install the ko.zst to /lib/modules/$(uname -r)/update
-# and then a depmod is called 
+# And then a depmod is called 
+# Side-effects of this target should can be removed by rm'ing the ko.zst and calling a depmod -a
 install:
 	$(MAKE) -C $(KDIR) M=$(CURDIR) modules_install
