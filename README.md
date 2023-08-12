@@ -35,7 +35,7 @@ Luckily WUJIE14 has these performance mode related [wmi](https://www.kernel.org/
 
 The better part is that some Linux desktop environments(DE) implement GUI power profile tweaking tools on top of this standard interface. Taking KDE as example, with this kernel module loaded you could conveniently check and set the performance mode with the "Battery and Brightness" system tray entry:
 
-<img src="assets/systemtray.png" alt="systray" width="200" />
+<img src="assets/systemtray.png" alt="systray" width="350" />
 
 
 ### 2. Keyboard backlight brigtness level and auto-shutoff time configuring
