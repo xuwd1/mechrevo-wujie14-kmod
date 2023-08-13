@@ -5,6 +5,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # default kernel header location
 execute_process(COMMAND uname -r OUTPUT_VARIABLE UNAME_R)
+string(STRIP ${UNAME_R} UNAME_R)
 set(DEFAULT_KHEADER_DIR /lib/modules/${UNAME_R}/build)
 
 # user options
