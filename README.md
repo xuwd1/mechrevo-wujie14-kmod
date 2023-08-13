@@ -65,3 +65,82 @@ The WUJIE14 has keyboard backlight with three brightness level off, dim and brig
     $ echo -1 | sudo tee /sys/devices/pci0000:00/0000:00:14.3/PNP0C09:00/keyboard_backlight_time
     ```
     Here the number written should be in range of signed char(s8), i.e., [-128,127] and it is only known that here 0 represents 30s, 1 represents 1 minute and -1 represents forever.
+
+
+## Building, testing and installing
+
+This project also serves as a demonstration of [Yet another cmake-kernel-module](https://github.com/xuwd1/yet-another-cmake-kernel-module), which aims at using cmake as a Linux kernel module build system generator and its main advantage is that with cmake generated `compile_commands.json` one could easily use some modern language server as `clangd` or `ccls` that brings code navigating/hinting functionalities.
+
+### Building the kernel module `wujie14.ko`
+Simply do the following:
+```shell
+$ mkdir build && cd build
+$ cmake .. -DHEADER_BUILD=OFF -DDKMS=ON -G'Unix Makefiles'
+$ make module
+```
+With `modinfo` you could check some details about the built module:
+```shell
+$ modinfo ./wujie14.ko
+filename:       /blah/blah/mechrevo-wujie14-kmod/build/wujie14.ko
+description:    mechrevo wujie 14 driver km
+author:         David Xu
+license:        GPL
+srcversion:     FC2949389F1E779A82AFFB4
+alias:          acpi*:PNP0C09:*
+depends:        platform_profile,wmi
+retpoline:      Y
+name:           wujie14
+vermagic:       6.4.10-arch1-1 SMP preempt mod_unload
+``` 
+Note that this module depends on symbols that `platform_profile` and `wmi` provides.
+
+
+### Testing the kernel module
+After building the `wujie14.ko`, you could now test it. First is to make sure that the dependee modules `platform_profile` and `wmi`
+```shell
+$ sudo modprobe platform_profile
+$ sudo modprobe wmi
+```
+Then load the `wujie14.ko`:
+```shell
+$ sudo insmod wujie14.ko
+```
+Restart the `power-profile-daemon` and call the `powerprofilesctl`. If everything is right the `powerprofilesctl` should report like the following:
+```shell
+$ sudo systemctl restart power-profiles-daemon.service
+$ powerprofilesctl
+  performance:
+    Driver:     platform_profile
+    Degraded:   no
+
+* balanced:
+    Driver:     platform_profile
+
+  power-saver:
+    Driver:     platform_profile
+```
+And now you should be able to see the sysfs attributes this module gives. Please refer to [the previous section](#more-detailed-explainations-on-the-purpose-of-this-kernel-module). In addition, if running KDE, check the "Battery and Brightness" system tray entry and you should see a tweakable "Power Profile" bar now. 
+
+### Installing the module
+There are two recommended methods to install the module.
+#### 1. Installing with dkms
+First make sure that the cmake project was configured with `-DDKMS` as the [above section](#building-the-kernel-module-wujie14ko) suggests. Under the `build` directory execute:
+```shell
+$ sudo make dkms-prepare
+$ sudo make dkms-build
+$ sudo make dkms-install
+```
+For the above make targets:
+1. `dkms-prepare` copies the source files, generated `Kbuild` and the configured `dkms.conf` to `/usr/src/wujie14-km-$VER`
+2. `dkms-build` calls the dkms to add this kernel module to its tree and do building.
+3. `dkms-install` calls the dkms to install the compressed kernel module `wujie14.ko.zst` to `/usr/lib/modules/$(uname -r)/extramodules` and execute `depmod`
+
+After installing, call `sudo modprobe wujie14` and the module should be loaded. Additionally, if using systemd, you could create a file `/usr/lib/modules-load.d/wujie14.conf` with the following content:
+
+```
+wujie14
+```
+This enables the systemd to automatically load this module at boot time.
+
+#### 2. (Arch only) AUR package
+WIP
