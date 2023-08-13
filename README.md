@@ -143,4 +143,8 @@ wujie14
 This enables the systemd to automatically load this module at boot time.
 
 #### 2. (Arch only) AUR package
-WIP
+
+Just install the AUR package [mechrevo-wujie14-dkms](https://aur.archlinux.org/packages/mechrevo-wujie14-dkms). For example with `yay`:
+```shell
+$ yay -S mechrevo-wujie14-dkms
+```
