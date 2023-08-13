@@ -1,0 +1,7 @@
+PACKAGE_NAME="@DKMS_PACKAGE_NAME@"
+PACKAGE_VERSION="@DKMS_PACKAGE_VERSION@"
+#MAKE[0]="make -C /usr/lib/modules/$kernelver/build M=$dkms_tree/$module/$module_version/build modules"
+#CLEAN="make -C /usr/lib/modules/$kernelver/build M=$dkms_tree/$module/$module_version/build clean"
+BUILT_MODULE_NAME[0]="@MODULE_NAME@"
+DEST_MODULE_LOCATION[0]="@DKMS_DEST_LOCATION@s"
+AUTOINSTALL="yes"

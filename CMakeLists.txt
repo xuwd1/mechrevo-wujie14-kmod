@@ -3,14 +3,18 @@ project(wujie14-km VERSION 0.1 LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+# default kernel header location
+execute_process(COMMAND uname -r OUTPUT_VARIABLE UNAME_R)
+set(DEFAULT_KHEADER_DIR /lib/modules/${UNAME_R}/build)
 
 # user options
 set(FULL_KERNEL_DIR "" CACHE STRING "Path to full kernel source tree")
-set(HEADER_ONLY_KERNEL_DIR "" CACHE STRING "Path to header-only kernel source tree") 
+set(HEADER_ONLY_KERNEL_DIR ${DEFAULT_KHEADER_DIR} CACHE STRING "Path to header-only kernel source tree") 
 option(HEADER_BUILD "Use full kernel tree for compilation database and build with header-only kernel tree. \
                      If set ON, both FULL_KERNEL_DIR and HEADER_ONLY_KERNEL_DIR have to be provided, \
-                     otherwise use HEADER_ONLY_KERNEL_DIR for both compilation database and building" ON)
+                     otherwise use HEADER_ONLY_KERNEL_DIR for both compilation database and building" OFF)
 option(CLANGD "Remove compile flags that are not understood by clangd" ON)
+option(DKMS "Generate dkms.conf by configuring dkms.conf.in and enable dkms support" ON)
 
 # tell cmake to generate JSON compilation database
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -80,8 +84,19 @@ string(CONCAT KBUILD_OBJ_Y_STR ${KBUILD_OBJ_Y_STR} "\n")
 set(GENERATED_KBUILD_FILE ${CMAKE_SOURCE_DIR}/Kbuild)
 file(WRITE ${GENERATED_KBUILD_FILE} ${KBUILD_OBJ_M_STR} ${KBUILD_OBJ_Y_STR})
 
-### end of Kbuild generation###
+### end of Kbuild generation ###
 
+### start of dkms generation ###
+if(DKMS AND EXISTS ${CMAKE_SOURCE_DIR}/dkms.conf.in)
+    set(DKMS_PACKAGE_NAME ${CMAKE_PROJECT_NAME})
+    set(DKMS_PACKAGE_VERSION ${PROJECT_VERSION})
+    # actually dkms is smart enough to get a correct make and clean command
+    #set(DKMS_MAKECMD "$(MAKE) -C ${KERNELDIR_BUILD} M=$(CURDIR) modules")
+    #set(DKMS_CLEANCMD "$(MAKE) -C ${KERNELDIR_BUILD} M=$(CURDIR) clean")
+    set(DKMS_DEST_LOCATION "/extramodules")
+    set(GENERATED_DKMS_CONF ${CMAKE_SOURCE_DIR}/dkms.conf)
+    configure_file(dkms.conf.in ${CMAKE_SOURCE_DIR}/dkms.conf)
+endif()
 
 
 ### start of dummy module building ###
@@ -161,12 +176,56 @@ add_custom_command(OUTPUT ${MODULE_KO}
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         DEPENDS ${ALL_MODULE_SRC} VERBATIM)
 add_custom_target(module ALL DEPENDS ${MODULE_KO})
-# custom target 'module=clean' for cleaning and deleting the generated Kbuild
-add_custom_target(module-clean COMMAND ${KBUILD_CMD} clean && rm ${GENERATED_KBUILD_FILE})
-
+# custom target 'module-clean' for cleaning
+add_custom_target(module-clean COMMAND ${KBUILD_CMD} clean VERBATIM)
+# custom target 'gen-clean' that cleans the generated files
+list(APPEND ALL_GEN_FILES ${GENERATED_KBUILD_FILE})
+if(DKMS)
+    list(APPEND ALL_GEN_FILES ${GENERATED_DKMS_CONF})
+endif()
+add_custom_target(gen-clean COMMAND rm ${ALL_GEN_FILES} VERBATIM)
+# custom target 'allclean' that cleans everything
+add_custom_target(allclean DEPENDS gen-clean module-clean)
+# custom target 'module-xz' that compresses the module object
 set(MODULE_KO_XZ ${MODULE_KO}.xz)
 add_custom_command(OUTPUT ${MODULE_KO_XZ}
-                   COMMAND xz -T1 -f ${MODULE_KO}
+                   COMMAND xz -T1 -fk ${MODULE_KO}
                    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
                    DEPENDS ${MODULE_KO} VERBATIM)
 add_custom_target(module-xz ALL DEPENDS ${MODULE_KO_XZ})
+
+
+# only dkms installing is provided
+if(DKMS)   
+    set(DKMS_MODULE_DIR /usr/src/${DKMS_PACKAGE_NAME}-${DKMS_PACKAGE_VERSION})
+    add_custom_target(dkms-prepare 
+        COMMAND mkdir -p ${DKMS_MODULE_DIR}
+        COMMAND cp -f ${CMAKE_SOURCE_DIR}/wujie14-kb.c ${CMAKE_SOURCE_DIR}/wujie14-kb.h  ${DKMS_MODULE_DIR}
+        COMMAND cp -f ${CMAKE_SOURCE_DIR}/wujie14-km.c ${CMAKE_SOURCE_DIR}/wujie14-km.h  ${DKMS_MODULE_DIR}
+        COMMAND cp -f ${CMAKE_SOURCE_DIR}/wujie14-perfmode.c ${CMAKE_SOURCE_DIR}/wujie14-perfmode.h  ${DKMS_MODULE_DIR}
+        COMMAND cp -f ${CMAKE_SOURCE_DIR}/wujie14-wmi-event.c ${CMAKE_SOURCE_DIR}/wujie14-wmi-event.h  ${DKMS_MODULE_DIR}
+        COMMAND cp -f ${CMAKE_SOURCE_DIR}/dkms.conf ${DKMS_MODULE_DIR}
+        COMMAND cp -f ${CMAKE_SOURCE_DIR}/Kbuild ${DKMS_MODULE_DIR}
+        VERBATIM)
+
+    add_custom_target(dkms-add 
+        COMMAND dkms add -m ${DKMS_PACKAGE_NAME} -v ${DKMS_PACKAGE_VERSION}
+        VERBATIM)
+
+    add_custom_target(dkms-build
+        COMMAND dkms build -m ${DKMS_PACKAGE_NAME} -v ${DKMS_PACKAGE_VERSION}
+        VERBATIM)
+    
+    add_custom_target(dkms-install
+        COMMAND dkms install -m ${DKMS_PACKAGE_NAME} -v ${DKMS_PACKAGE_VERSION}
+        VERBATIM)
+
+    add_custom_target(dkms-remove
+        COMMAND dkms remove -m ${DKMS_PACKAGE_NAME} -v ${DKMS_PACKAGE_VERSION}
+        VERBATIM)
+
+    add_custom_target(dkms-clean
+        COMMAND rm -rf ${DKMS_MODULE_DIR}
+        VERBATIM)
+
+endif()
