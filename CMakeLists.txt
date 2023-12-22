@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.23)
-project(wujie14-km VERSION 0.1 LANGUAGES C)
+project(wujie14-km VERSION 0.2 LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
@@ -94,7 +94,7 @@ if(DKMS AND EXISTS ${CMAKE_SOURCE_DIR}/dkms.conf.in)
     # actually dkms is smart enough to get a correct make and clean command
     #set(DKMS_MAKECMD "$(MAKE) -C ${KERNELDIR_BUILD} M=$(CURDIR) modules")
     #set(DKMS_CLEANCMD "$(MAKE) -C ${KERNELDIR_BUILD} M=$(CURDIR) clean")
-    set(DKMS_DEST_LOCATION "/extramodules")
+    set(DKMS_DEST_LOCATION "/kernel/../extramodules")
     set(GENERATED_DKMS_CONF ${CMAKE_SOURCE_DIR}/dkms.conf)
     configure_file(dkms.conf.in ${CMAKE_SOURCE_DIR}/dkms.conf)
 endif()
@@ -199,6 +199,7 @@ add_custom_target(module-xz ALL DEPENDS ${MODULE_KO_XZ})
 # only dkms installing is provided
 if(DKMS)   
     set(DKMS_MODULE_DIR /usr/src/${DKMS_PACKAGE_NAME}-${DKMS_PACKAGE_VERSION})
+    # This copies all needed source files to /usr/src/wujie14-km-VERSION
     add_custom_target(dkms-prepare 
         COMMAND mkdir -p ${DKMS_MODULE_DIR}
         COMMAND cp -f ${CMAKE_SOURCE_DIR}/wujie14-kb.c ${CMAKE_SOURCE_DIR}/wujie14-kb.h  ${DKMS_MODULE_DIR}
@@ -209,6 +210,7 @@ if(DKMS)
         COMMAND cp -f ${CMAKE_SOURCE_DIR}/Kbuild ${DKMS_MODULE_DIR}
         VERBATIM)
 
+    # This adds the module to dkms tree, i.e, /var/lib/dkms
     add_custom_target(dkms-add 
         COMMAND dkms add -m ${DKMS_PACKAGE_NAME} -v ${DKMS_PACKAGE_VERSION}
         VERBATIM)
@@ -217,16 +219,26 @@ if(DKMS)
         COMMAND dkms build -m ${DKMS_PACKAGE_NAME} -v ${DKMS_PACKAGE_VERSION}
         VERBATIM)
     
+    # This calls dkms install to install the module,
+    # which implies that dkms will build the module and install it to 
+    # 1. if dkms on your distro is set to respect the 
+    # DEST_MODULE_LOCATION in dkms.conf, would be in /usr/lib/modules/$(uname -r)/extramodules
+    # 2. else, would be in /lib/modules/$(uname -r)/updates/dkms
     add_custom_target(dkms-install
         COMMAND dkms install -m ${DKMS_PACKAGE_NAME} -v ${DKMS_PACKAGE_VERSION}
+        DEPENDS dkms-prepare
         VERBATIM)
 
     add_custom_target(dkms-remove
         COMMAND dkms remove -m ${DKMS_PACKAGE_NAME} -v ${DKMS_PACKAGE_VERSION}
         VERBATIM)
 
+    # This removes the source files from /usr/src/wujie14-km-VERSION
     add_custom_target(dkms-clean
         COMMAND rm -rf ${DKMS_MODULE_DIR}
         VERBATIM)
-
+    
+    # Convenient target for installing the module
+    add_custom_target(install-mod DEPENDS dkms-prepare dkms-install)
+    
 endif()
