@@ -1,8 +1,11 @@
-# Mechrevo WUJIE14 Kernel Module
+# Mechrevo WUJIE14 Linux Kernel Module (机械革命无界14/无界14+（IP3 xN39）Linux性能模式内核模块)
+
 
 ## What is this
 
 This is a Linux kernel module for Mechrevo WUJIE14 laptop that implements a Linux platform profile driver and exports keyboard backlight level/shut-time sysfs attributes.
+
+本Linux内核模块用于实现对机械革命无界14/无界14+的性能模式探测/调节，以及键盘背光时间的控制，应当适用于所有IP3 xN39模具的笔记本（如火影众颜U4，但我没有这款机器，如果读者可以测试，请不吝告知！）
 
 ## More detailed explainations on the purpose of this kernel module
 
