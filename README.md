@@ -1,6 +1,5 @@
 # Mechrevo WUJIE14 Linux Kernel Module (机械革命无界14/无界14+（IP3 xN39）Linux性能模式内核模块)
 
-
 ## What is this
 
 This is a Linux kernel module for Mechrevo WUJIE14 laptop that implements a Linux platform profile driver and exports keyboard backlight level/shut-time sysfs attributes.
@@ -40,6 +39,10 @@ Luckily WUJIE14 has these performance mode related [wmi](https://www.kernel.org/
 The better part is that some Linux desktop environments(DE) implement GUI power profile tweaking tools on top of this standard interface. Taking KDE as example, with this kernel module loaded you could conveniently check and set the performance mode with the "Battery and Brightness" system tray entry:
 
 <img src="assets/systemtray.png" alt="systray" width="350" />
+
+Please note that the `power-profile-daemon` has to be installed and active for KDE plasma to show the current power profile like in the above screenshot, since obviously plasma relies on `power-profile-daemon` to retreive the information. However quite unfortunately `power-profile-deamon` is in conflict with `tlp`, so in case you would prefer to use `tlp` I also have made a simple KDE Plasma widget to visualize the current power profile. Check [here](#A very simple KDE plasma widget (aka "plasmoid") : Power-Profile-Monitor) for details.
+
+
 
 ### 2. Keyboard backlight brigtness level and auto-shutoff time configuring
 
@@ -223,3 +226,30 @@ $ yay -Rus mechrevo-wujie14-dkms
 ```shell
 $ sudo rm -rf /var/lib/dkms/wujie14-km
 ```
+
+
+
+## A very simple KDE plasma widget (aka "plasmoid") : Power-Profile-Monitor
+
+I also made a very simple KDE plasma widget based on [this execellent work](https://github.com/atul-g/battery-power-monitor) to visualize the current platform power profile. As in the image below:
+
+<img src="assets/powerprofilemon.png" alt="systray" width="350" />
+
+this plasma widget simply polls the output of `/sys/firmware/acpi/pla
+tform_profile` and shows:
+
+- Letter P for performance
+- Letter B for balance
+- Letter E for quiet
+
+Besides, the polling interval can also be configured. The default is once per second.
+
+### How to use this
+
+1. Right click on your plasma desktop and select "Add Widgets..."
+2. "Get New Widgets..." -> "Install Widget from local file"
+3. Select `path/to/this/repo/plasma-platform-profile/package.plasmoid`
+4. Now again go select "Add Widgets" like in the first step and search for the newly installed widget, then add it to your desktop.
+   
+- You could then place the widget on the panel just like in the above screenshot.
+- Obviously you have to be running KDE Plasma to do this.

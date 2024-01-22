@@ -1,0 +1,22 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "xuwd1@hotmail.com",
+                "Name": "David Xu"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Displays Real Time Platform Profile",
+        "Icon": "battery",
+        "Id": "org.kde.PowerProfileMonitor",
+        "Name": "Power Profile Monitor",
+        "ServiceTypes": [
+            "Plasma/Applet"
+        ],
+        "Version": "0.2",
+        "Website": ""
+    },
+    "X-Plasma-API": "declarativeappletscript",
+    "X-Plasma-MainScript": "ui/main.qml"
+}

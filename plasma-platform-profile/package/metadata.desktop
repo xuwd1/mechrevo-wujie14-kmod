@@ -1,0 +1,16 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Power Profile Monitor
+Comment=Displays Real Time Platform Profile
+Type=Service
+X-KDE-PluginInfo-Author=David Xu
+X-KDE-PluginInfo-Email=xuwd1@hotmail.com
+X-KDE-PluginInfo-License=GPL2
+X-KDE-PluginInfo-Name=org.kde.PowerProfileMonitor
+X-KDE-PluginInfo-Version=0.2
+X-KDE-PluginInfo-Website=
+X-KDE-ServiceTypes=Plasma/Applet
+X-Plasma-API=declarativeappletscript
+X-Plasma-MainScript=ui/main.qml
+X-KDE-PluginInfo-Category=System Information
+Icon=battery
