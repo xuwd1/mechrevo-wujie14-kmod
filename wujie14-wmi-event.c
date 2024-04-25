@@ -63,6 +63,7 @@ static void wujie14_wmi_event_handler(
         return;
     }
     handler(priv); 
+    ACPI_FREE(response.pointer);
 }
 
 int wujie14_wmi_event_init(struct wujie14_private* priv)

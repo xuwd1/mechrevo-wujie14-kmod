@@ -11,6 +11,7 @@
 static int wujie14_set_powermode_wmi(struct wujie14_private* priv, enum wujie14_powermode powermode)
 {
     acpi_status status;
+    int retval;
     u8 powermode_in = powermode;
     struct acpi_buffer params = {sizeof(powermode_in), &powermode_in};
     if (!(powermode == WUJIE14_QUIET_MODE || 
@@ -26,15 +27,18 @@ static int wujie14_set_powermode_wmi(struct wujie14_private* priv, enum wujie14_
         NULL);
     if (ACPI_FAILURE(status)) {
         dev_err(&priv->pdev->dev,"wmi call failed\n");
-        return -EIO;
+        retval = -EIO;
+    } else {
+        retval = 0;
     }
     
-    return 0;
+    return retval;
 }
 
 static int wujie14_get_powermode_wmi(struct wujie14_private* priv, enum wujie14_powermode* powermode)
 {
     acpi_status status;
+    int retval;
     struct acpi_buffer params = {0, NULL};
     struct acpi_buffer outbuffer = {ACPI_ALLOCATE_BUFFER, NULL};
     union acpi_object* out;
@@ -48,12 +52,15 @@ static int wujie14_get_powermode_wmi(struct wujie14_private* priv, enum wujie14_
     );
     if (ACPI_FAILURE(status)) {
         dev_err(&priv->pdev->dev,"wmi call failed\n");
-        return -EIO; 
+        retval = -EIO;
+    } else {
+        retval = 0;
     }
     out = outbuffer.pointer;
     *powermode = out->integer.value;
+    ACPI_FREE(outbuffer.pointer);
     
-    return 0;
+    return retval;
 }
 
 void wujie14_powermode_wmi_event_handler(struct wujie14_private* priv)

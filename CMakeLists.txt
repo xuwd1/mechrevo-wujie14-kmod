@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.23)
-project(wujie14-km VERSION 0.2 LANGUAGES C)
+project(wujie14-km VERSION 1.0 LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
