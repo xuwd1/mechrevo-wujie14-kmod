@@ -23,5 +23,5 @@ enum kb_backlight_level{
 #define EC_DATA_PORT 0x62
 
 
-int wujie14_sysfs_init(struct wujie14_private* priv);
-void wujie14_sysfs_exit(struct wujie14_private* priv);
+int wujie14_kbd_sysfs_init(struct wujie14_private* priv);
+void wujie14_kbd_sysfs_exit(struct wujie14_private* priv);

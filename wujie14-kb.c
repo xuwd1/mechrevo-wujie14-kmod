@@ -4,6 +4,7 @@
 #include <linux/device.h>
 #include <linux/sysfs.h>
 #include <linux/platform_device.h>
+#include <linux/moduleparam.h>
 
 #include "wujie14-kb.h"
 #include "wujie14-km.h"
@@ -153,6 +154,17 @@ static ssize_t keyboard_backlight_time_show(struct device* dev,
     return sysfs_emit(buf, "%hhX\n", data);
 }
 
+static int init_backlight_time = -1;
+
+module_param(init_backlight_time, int, S_IRUGO);
+MODULE_PARM_DESC(init_backlight_time, "Keyboard backlight time to set on module load");
+
+static int write_keyboard_backlight_time(s8 new_time){
+    int err;
+    err = write_ecram(0x34, (u8)new_time);
+    return err;
+}
+
 static ssize_t keyboard_backlight_time_store(struct device *dev,
 			        struct device_attribute *attr, const char *buf,
 			        size_t count)
@@ -163,18 +175,27 @@ static ssize_t keyboard_backlight_time_store(struct device *dev,
     if (err) {
         return err;
     }
-    err = write_ecram(0x34, (u8)new_time);
+    err = write_keyboard_backlight_time(new_time);
     if (err) {
         return err;
     }
+    // err = write_ecram(0x34, (u8)new_time);
+    // if (err) {
+    //     return err;
+    // }
     return count;
 }
 
 static DEVICE_ATTR_RW(keyboard_backlight_time);
 
 // sysfs attrs should be under /sys/devices/pci0000:00/0000:00:14.3/PNP0C09:00
-int wujie14_sysfs_init(struct wujie14_private* priv){
+int wujie14_kbd_sysfs_init(struct wujie14_private* priv){
     int err = 0;
+    // set init keyboard backlight time
+    if (init_backlight_time <= S8_MAX && init_backlight_time >= S8_MIN){
+        err = write_keyboard_backlight_time((s8)init_backlight_time);
+        if (err) goto error;
+    }
     err = device_create_file(&priv->pdev->dev,&dev_attr_keyboard_backlight_level);
     if (err) goto error;
     err = device_create_file(&priv->pdev->dev,&dev_attr_keyboard_backlight_time);
@@ -183,7 +204,7 @@ error:
     return err;
 }
 
-void wujie14_sysfs_exit(struct wujie14_private* priv){
+void wujie14_kbd_sysfs_exit(struct wujie14_private* priv){
     device_remove_file(&priv->pdev->dev,&dev_attr_keyboard_backlight_level);
     device_remove_file(&priv->pdev->dev,&dev_attr_keyboard_backlight_time);
 }

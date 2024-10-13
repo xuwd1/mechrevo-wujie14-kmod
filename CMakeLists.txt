@@ -16,7 +16,7 @@ option(HEADER_BUILD "Use full kernel tree for compilation database and build wit
                      otherwise use HEADER_ONLY_KERNEL_DIR for both compilation database and building" OFF)
 option(CLANGD "Remove compile flags that are not understood by clangd" ON)
 option(DKMS "Generate dkms.conf by configuring dkms.conf.in and enable dkms support" ON)
-
+option(NO_PLATFORM_PROFILE "Do not include platform profile control in the module" ON)
 # tell cmake to generate JSON compilation database
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -62,6 +62,15 @@ list(APPEND MODULE_SRC_LIST
     wujie14-perfmode.c 
     wujie14-wmi-event.c
     wujie14-kb.c)
+
+list(APPEND _HEADER_NAMES)
+# collect all header files in the source directory
+file(GLOB ALL_MODULE_HEADER "${CMAKE_SOURCE_DIR}/*.h")
+foreach(FILE IN LISTS ALL_MODULE_HEADER)
+    get_filename_component(FILE_NAME ${FILE} NAME)
+    list(APPEND _HEADER_NAMES ${FILE_NAME})
+endforeach()
+set(ALL_MODULE_HEADER ${_HEADER_NAMES})
 
 
 list(APPEND ALL_MODULE_SRC ${MODULE_SRC_LIST})
@@ -165,35 +174,105 @@ foreach(MODULE_SRCFILE ${ALL_MODULE_SRC})
     string(REGEX REPLACE "\.c" "" BASENAME ${MODULE_SRCFILE})
     target_compile_definitions(${MODULE_SRCFILE}_dummy_target PRIVATE -DKBUILD_BASENAME=\"${BASENAME}\")
     target_compile_definitions(${MODULE_SRCFILE}_dummy_target PRIVATE -D__KBUILD_MODNAME=kmod_${MODULE_NAME})
+    if(NO_PLATFORM_PROFILE)
+        target_compile_definitions(${MODULE_SRCFILE}_dummy_target PRIVATE -DNO_PLATFORM_PROFILE)
+    endif()
 endforeach()
 
+list(APPEND ALL_COPIED_MODULE_SRC)
 
-# finally the custom target 'module' for actually building the module
-# thus, you build your module after cmake configuring with 'make module'
-set(MODULE_KO ${MODULE_NAME}.ko)
-set(KBUILD_CMD $(MAKE) -C ${KERNELDIR_BUILD} modules M=${CMAKE_BINARY_DIR} src=${CMAKE_SOURCE_DIR})
-add_custom_command(OUTPUT ${MODULE_KO}
-        COMMAND ${KBUILD_CMD}
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        DEPENDS ${ALL_MODULE_SRC} VERBATIM)
-add_custom_target(module ALL DEPENDS ${MODULE_KO})
-# custom target 'module-clean' for cleaning
-add_custom_target(module-clean COMMAND ${KBUILD_CMD} clean VERBATIM)
-# custom target 'gen-clean' that cleans the generated files
-list(APPEND ALL_GEN_FILES ${GENERATED_KBUILD_FILE})
-if(DKMS)
-    list(APPEND ALL_GEN_FILES ${GENERATED_DKMS_CONF})
+foreach(MODULE_SRC IN LISTS ALL_MODULE_SRC)
+    set(COPIED_MODULE_SRC ${CMAKE_BINARY_DIR}/${MODULE_SRC})
+    list(APPEND ALL_COPIED_MODULE_SRC ${COPIED_MODULE_SRC})
+    add_custom_command(
+        OUTPUT ${COPIED_MODULE_SRC}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/${MODULE_SRC} ${COPIED_MODULE_SRC}
+        DEPENDS ${CMAKE_SOURCE_DIR}/${MODULE_SRC}
+        COMMENT "Copy ${MODULE_SRC} to ${CMAKE_BINARY_DIR}"
+    ) 
+endforeach()
+
+foreach(MODULE_HEADER IN LISTS ALL_MODULE_HEADER)
+    message(STATUS "MODULE_HEADER: ${MODULE_HEADER}")
+    set(COPIED_MODULE_HEADER ${CMAKE_BINARY_DIR}/${MODULE_HEADER})
+    list(APPEND ALL_COPIED_MODULE_HEADER ${COPIED_MODULE_HEADER})
+    add_custom_command(
+        OUTPUT ${COPIED_MODULE_HEADER}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/${MODULE_HEADER} ${COPIED_MODULE_HEADER}
+        DEPENDS ${CMAKE_SOURCE_DIR}/${MODULE_HEADER}
+        COMMENT "Copy ${MODULE_HEADER} to ${CMAKE_BINARY_DIR}"
+    )
+endforeach()
+
+add_custom_target(
+    copy-module-src ALL DEPENDS ${ALL_COPIED_MODULE_SRC} ${ALL_COPIED_MODULE_HEADER}
+    COMMENT "Copy module source files to ${CMAKE_BINARY_DIR}"
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/Kbuild
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GENERATED_KBUILD_FILE} ${CMAKE_BINARY_DIR}/Kbuild
+    DEPENDS ${GENERATED_KBUILD_FILE}
+    COMMENT "Copy Kbuild to ${CMAKE_BINARY_DIR}"
+)
+
+add_custom_target(
+    copy-kbuild ALL DEPENDS ${CMAKE_BINARY_DIR}/Kbuild
+    COMMENT "Copy Kbuild to ${CMAKE_BINARY_DIR}"
+)
+
+add_custom_target(
+    copy-for-build ALL DEPENDS copy-module-src copy-kbuild
+    COMMENT "Copy module source files and Kbuild to ${CMAKE_BINARY_DIR}"
+)
+
+list(APPEND MAKE_EXTRA_CFLAGS)
+if (NO_PLATFORM_PROFILE)
+    list(APPEND MAKE_EXTRA_CFLAGS -DNO_PLATFORM_PROFILE)
 endif()
-add_custom_target(gen-clean COMMAND rm ${ALL_GEN_FILES} VERBATIM)
-# custom target 'allclean' that cleans everything
-add_custom_target(allclean DEPENDS gen-clean module-clean)
-# custom target 'module-xz' that compresses the module object
-set(MODULE_KO_XZ ${MODULE_KO}.xz)
-add_custom_command(OUTPUT ${MODULE_KO_XZ}
-                   COMMAND xz -T1 -fk ${MODULE_KO}
-                   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-                   DEPENDS ${MODULE_KO} VERBATIM)
-add_custom_target(module-xz ALL DEPENDS ${MODULE_KO_XZ})
+
+set(MODULE_KO ${MODULE_NAME}.ko)
+set(KBUILD_CMD $(MAKE) -C ${KERNELDIR_BUILD} M=${CMAKE_BINARY_DIR} EXTRA_CFLAGS="${MAKE_EXTRA_CFLAGS}" modules)
+
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/${MODULE_KO}
+    COMMAND ${KBUILD_CMD}
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    DEPENDS copy-for-build
+
+)
+
+add_custom_target(
+    build-module DEPENDS ${CMAKE_BINARY_DIR}/${MODULE_KO}
+)
+
+
+# # finally the custom target 'module' for actually building the module
+# # thus, you build your module after cmake configuring with 'make module'
+# set(MODULE_KO ${MODULE_NAME}.ko)
+# set(KBUILD_CMD $(MAKE) -C ${KERNELDIR_BUILD} modules M=${CMAKE_BINARY_DIR} src=${CMAKE_SOURCE_DIR})
+# add_custom_command(OUTPUT ${MODULE_KO}
+#         COMMAND ${KBUILD_CMD}
+#         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+#         DEPENDS ${ALL_MODULE_SRC} VERBATIM)
+# add_custom_target(module ALL DEPENDS ${MODULE_KO})
+# # custom target 'module-clean' for cleaning
+# add_custom_target(module-clean COMMAND ${KBUILD_CMD} clean VERBATIM)
+# # custom target 'gen-clean' that cleans the generated files
+# list(APPEND ALL_GEN_FILES ${GENERATED_KBUILD_FILE})
+# if(DKMS)
+#     list(APPEND ALL_GEN_FILES ${GENERATED_DKMS_CONF})
+# endif()
+# add_custom_target(gen-clean COMMAND rm ${ALL_GEN_FILES} VERBATIM)
+# # custom target 'allclean' that cleans everything
+# add_custom_target(allclean DEPENDS gen-clean module-clean)
+# # custom target 'module-xz' that compresses the module object
+# set(MODULE_KO_XZ ${MODULE_KO}.xz)
+# add_custom_command(OUTPUT ${MODULE_KO_XZ}
+#                    COMMAND xz -T1 -fk ${MODULE_KO}
+#                    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+#                    DEPENDS ${MODULE_KO} VERBATIM)
+# add_custom_target(module-xz ALL DEPENDS ${MODULE_KO_XZ})
 
 
 # only dkms installing is provided

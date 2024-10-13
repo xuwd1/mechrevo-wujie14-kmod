@@ -22,4 +22,7 @@ struct wujie14_private{
     struct platform_profile_handler pphandler;
 };
 
+int wujie_plat_probe(struct platform_device *pdev);
+void wujie_plat_remove(struct platform_device *pdev);
+
 #endif

@@ -16,7 +16,7 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("David Xu");
 MODULE_DESCRIPTION("mechrevo wujie 14 driver km");
 
-static struct wujie14_private priv;
+struct wujie14_private priv;
 
 
 int wujie_plat_probe(struct platform_device *pdev)
@@ -45,11 +45,16 @@ int wujie_plat_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Platform profile initialization failed.\n");
 		return err;
 	}
+	err = wujie14_powermode_sysfs_init(&priv);
+	if (err) {
+		dev_err(&pdev->dev, "Powermode sysfs initialization failed.\n");
+		return err;
+	}
 	err = wujie14_wmi_event_init(&priv);
 	if (err) {
 		return err;
 	}
-	err = wujie14_sysfs_init(&priv);
+	err = wujie14_kbd_sysfs_init(&priv);
 	if (err) {
 		return err;
 	}
@@ -60,8 +65,9 @@ int wujie_plat_probe(struct platform_device *pdev)
 void wujie_plat_remove(struct platform_device *pdev)
 {
 	wujie14_platform_profile_exit(&priv);
+	wujie14_powermode_sysfs_exit(&priv);
 	wujie14_wmi_event_exit(&priv);
-	wujie14_sysfs_exit(&priv);
+	wujie14_kbd_sysfs_exit(&priv);
 }
 
 
