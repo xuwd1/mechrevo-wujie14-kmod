@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.23)
-project(wujie14-km VERSION 1.0 LANGUAGES C)
+project(wujie14-km VERSION 1.1 LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
@@ -232,47 +232,33 @@ if (NO_PLATFORM_PROFILE)
 endif()
 
 set(MODULE_KO ${MODULE_NAME}.ko)
-set(KBUILD_CMD $(MAKE) -C ${KERNELDIR_BUILD} M=${CMAKE_BINARY_DIR} EXTRA_CFLAGS="${MAKE_EXTRA_CFLAGS}" modules)
+set(MODULE_KO_XZ ${MODULE_KO}.xz)
+set(KBUILD_CMD $(MAKE) -C ${KERNELDIR_BUILD} M=${CMAKE_BINARY_DIR} EXTRA_CFLAGS="${MAKE_EXTRA_CFLAGS}")
 
 add_custom_command(
     OUTPUT ${CMAKE_BINARY_DIR}/${MODULE_KO}
-    COMMAND ${KBUILD_CMD}
+    COMMAND ${KBUILD_CMD} modules
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     DEPENDS copy-for-build
 
 )
 
-add_custom_target(
-    build-module DEPENDS ${CMAKE_BINARY_DIR}/${MODULE_KO}
-)
 
+###### make targets ######
 
-# # finally the custom target 'module' for actually building the module
-# # thus, you build your module after cmake configuring with 'make module'
-# set(MODULE_KO ${MODULE_NAME}.ko)
-# set(KBUILD_CMD $(MAKE) -C ${KERNELDIR_BUILD} modules M=${CMAKE_BINARY_DIR} src=${CMAKE_SOURCE_DIR})
-# add_custom_command(OUTPUT ${MODULE_KO}
-#         COMMAND ${KBUILD_CMD}
-#         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-#         DEPENDS ${ALL_MODULE_SRC} VERBATIM)
-# add_custom_target(module ALL DEPENDS ${MODULE_KO})
-# # custom target 'module-clean' for cleaning
-# add_custom_target(module-clean COMMAND ${KBUILD_CMD} clean VERBATIM)
-# # custom target 'gen-clean' that cleans the generated files
-# list(APPEND ALL_GEN_FILES ${GENERATED_KBUILD_FILE})
-# if(DKMS)
-#     list(APPEND ALL_GEN_FILES ${GENERATED_DKMS_CONF})
-# endif()
-# add_custom_target(gen-clean COMMAND rm ${ALL_GEN_FILES} VERBATIM)
-# # custom target 'allclean' that cleans everything
-# add_custom_target(allclean DEPENDS gen-clean module-clean)
-# # custom target 'module-xz' that compresses the module object
-# set(MODULE_KO_XZ ${MODULE_KO}.xz)
-# add_custom_command(OUTPUT ${MODULE_KO_XZ}
-#                    COMMAND xz -T1 -fk ${MODULE_KO}
-#                    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-#                    DEPENDS ${MODULE_KO} VERBATIM)
-# add_custom_target(module-xz ALL DEPENDS ${MODULE_KO_XZ})
+add_custom_target(module DEPENDS ${CMAKE_BINARY_DIR}/${MODULE_KO})
+add_custom_target(module-clean COMMAND ${KBUILD_CMD} clean VERBATIM)
+list(APPEND ALL_GEN_FILES ${GENERATED_KBUILD_FILE})
+if(DKMS)
+    list(APPEND ALL_GEN_FILES ${GENERATED_DKMS_CONF})
+endif()
+add_custom_target(gen-clean COMMAND rm ${ALL_GEN_FILES} VERBATIM)
+add_custom_target(all-clean DEPENDS gen-clean module-clean)
+add_custom_command(OUTPUT ${MODULE_KO_XZ}
+                   COMMAND xz -T1 -fk ${MODULE_KO}
+                   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+                   DEPENDS ${MODULE_KO} VERBATIM)
+add_custom_target(module-xz ALL DEPENDS ${MODULE_KO_XZ})
 
 
 # only dkms installing is provided
@@ -302,7 +288,7 @@ if(DKMS)
     # which implies that dkms will build the module and install it to 
     # 1. if dkms on your distro is set to respect the 
     # DEST_MODULE_LOCATION in dkms.conf, would be in /usr/lib/modules/$(uname -r)/extramodules
-    # 2. else, would be in /lib/modules/$(uname -r)/updates/dkms
+    # 2. else (e.g. ArchLinux), would be in /lib/modules/$(uname -r)/updates/dkms
     add_custom_target(dkms-install
         COMMAND dkms install -m ${DKMS_PACKAGE_NAME} -v ${DKMS_PACKAGE_VERSION}
         DEPENDS dkms-prepare
